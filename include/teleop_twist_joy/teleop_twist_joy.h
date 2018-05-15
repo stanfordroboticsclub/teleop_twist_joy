@@ -37,6 +37,7 @@ class TeleopTwistJoy
 {
 public:
   TeleopTwistJoy(ros::NodeHandle* nh, ros::NodeHandle* nh_param);
+  void checkTimeout(ros::Time now);
 
 private:
   struct Impl;

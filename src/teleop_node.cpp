@@ -25,6 +25,8 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
 
 #include "ros/ros.h"
 #include "teleop_twist_joy/teleop_twist_joy.h"
+#include <ros/callback_queue.h>
+#include "ros/time.h"
 
 int main(int argc, char *argv[])
 {
@@ -33,5 +35,10 @@ int main(int argc, char *argv[])
   ros::NodeHandle nh(""), nh_param("~");
   teleop_twist_joy::TeleopTwistJoy joy_teleop(&nh, &nh_param);
 
-  ros::spin();
+  // modified ros::spin();
+  while (ros::ok())
+  {
+  	joy_teleop.checkTimeout(ros::Time::now());
+  	ros::getGlobalCallbackQueue()->callAvailable(ros::WallDuration(0.1));
+  }
 }

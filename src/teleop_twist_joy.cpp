@@ -24,12 +24,12 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
 
 #include "geometry_msgs/Twist.h"
 #include "ros/ros.h"
+#include "ros/time.h"
 #include "sensor_msgs/Joy.h"
 #include "teleop_twist_joy/teleop_twist_joy.h"
 
 #include <map>
 #include <string>
-
 
 namespace teleop_twist_joy
 {
@@ -42,6 +42,7 @@ namespace teleop_twist_joy
 struct TeleopTwistJoy::Impl
 {
   void joyCallback(const sensor_msgs::Joy::ConstPtr& joy);
+  void sendDisableMsg(geometry_msgs::Twist stop_msg);
 
   ros::Subscriber joy_sub;
   ros::Publisher cmd_vel_pub;
@@ -57,6 +58,10 @@ struct TeleopTwistJoy::Impl
   std::map<std::string, double> scale_angular_map;
   std::map<std::string, double> scale_angular_turbo_map;
 
+  ros::Time last_msg_timestamp;
+  double timeout_lim;
+  const double default_timeout = 5.0; // default timeout is 5.0s
+
   bool sent_disable_msg;
 };
 
@@ -71,6 +76,8 @@ TeleopTwistJoy::TeleopTwistJoy(ros::NodeHandle* nh, ros::NodeHandle* nh_param)
 
   pimpl_->cmd_vel_pub = nh->advertise<geometry_msgs::Twist>("cmd_vel", 1, true);
   pimpl_->joy_sub = nh->subscribe<sensor_msgs::Joy>("joy", 1, &TeleopTwistJoy::Impl::joyCallback, pimpl_);
+  
+  nh_param->param<double>("timeout", pimpl_->timeout_lim, pimpl_->default_timeout); 
 
   nh_param->param<int>("enable_button", pimpl_->enable_button, 0);
   nh_param->param<int>("enable_turbo_button", pimpl_->enable_turbo_button, -1);
@@ -129,6 +136,9 @@ TeleopTwistJoy::TeleopTwistJoy(ros::NodeHandle* nh, ros::NodeHandle* nh_param)
 
 void TeleopTwistJoy::Impl::joyCallback(const sensor_msgs::Joy::ConstPtr& joy_msg)
 {
+  // Update last message timestamp
+  last_msg_timestamp = ros::Time::now();
+
   // Initializes with zeros by default.
   geometry_msgs::Twist cmd_vel_msg;
 
@@ -196,12 +206,29 @@ void TeleopTwistJoy::Impl::joyCallback(const sensor_msgs::Joy::ConstPtr& joy_msg
   {
     // When enable button is released, immediately send a single no-motion command
     // in order to stop the robot.
+    sendDisableMsg(cmd_vel_msg);
+  }
+}
+
+void TeleopTwistJoy::checkTimeout(ros::Time now) 
+{
+  double delta_time = now.toSec() - pimpl_->last_msg_timestamp.toSec();
+  if (delta_time > pimpl_->timeout_lim)
+  {
+    // Initializes with zeros by default.
+    geometry_msgs::Twist cmd_vel_msg;
+
+    pimpl_->sendDisableMsg(cmd_vel_msg);
+  }
+}
+
+void TeleopTwistJoy::Impl::sendDisableMsg(geometry_msgs::Twist stop_msg) 
+{
     if (!sent_disable_msg)
     {
-      cmd_vel_pub.publish(cmd_vel_msg);
+      cmd_vel_pub.publish(stop_msg);
       sent_disable_msg = true;
     }
-  }
 }
 
 }  // namespace teleop_twist_joy
