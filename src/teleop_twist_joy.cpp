@@ -60,7 +60,7 @@ struct TeleopTwistJoy::Impl
 
   ros::Time last_msg_timestamp;
   double timeout_lim;
-  const double default_timeout = 5.0; // default timeout is 5.0s
+  const double default_timeout = 1.0; // default timeout is 1.0s
 
   bool sent_disable_msg;
 };
